@@ -49,42 +49,86 @@ googleLoginBtn.onclick = async () => {
     }
 };
 
-// Phone/OTP Login
-let confirmationResult = null;
+// Phone/OTP Login using Textbelt
+let sentOtp = '';
+let sentPhone = '';
+
 const sendOtpBtn = document.getElementById('sendOtp');
 const verifyOtpBtn = document.getElementById('verifyOtp');
 const otpInput = document.getElementById('otp');
 
-sendOtpBtn.onclick = async () => {
-    const phone = document.getElementById('phone').value;
-    if (!window.recaptchaVerifier) {
-        window.recaptchaVerifier = new firebase.auth.RecaptchaVerifier('recaptcha-container', {
-            size: 'normal',
-            callback: () => {},
-        });
-        window.recaptchaVerifier.render();
+// Add Resend OTP button dynamically
+let resendOtpBtn = document.getElementById('resendOtp');
+if (!resendOtpBtn) {
+    resendOtpBtn = document.createElement('button');
+    resendOtpBtn.type = 'button';
+    resendOtpBtn.id = 'resendOtp';
+    resendOtpBtn.textContent = 'Resend OTP';
+    resendOtpBtn.style.display = 'none';
+    resendOtpBtn.style.marginTop = '0.5rem';
+    otpInput.parentNode.insertBefore(resendOtpBtn, verifyOtpBtn.nextSibling);
+}
+
+function generateOtp() {
+    return Math.floor(100000 + Math.random() * 900000).toString();
+}
+
+
+async function sendOtp(phone, isResend = false) {
+    if (!/^\+?\d{10,15}$/.test(phone)) {
+        messageDiv.style.color = '#d32f2f';
+        messageDiv.textContent = 'Enter phone in international format, e.g. +1234567890';
+        return;
     }
+    sentOtp = generateOtp();
+    sentPhone = phone;
     try {
-        confirmationResult = await firebase.auth().signInWithPhoneNumber(phone, window.recaptchaVerifier);
-        otpInput.style.display = '';
-        verifyOtpBtn.style.display = '';
-        sendOtpBtn.disabled = true;
-        messageDiv.style.color = 'green';
-        messageDiv.textContent = 'OTP sent!';
+        const response = await fetch('https://textbelt.com/text', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: `phone=${encodeURIComponent(phone)}&message=${encodeURIComponent('Your OTP is: ' + sentOtp)}&key=d09ee6c3b6ce0e99a9a28bb56092ec2fae4b6421UghCzxt5omgqKy9sB2KTQuCuT`
+        });
+        const data = await response.json();
+        if (data.success) {
+            otpInput.style.display = '';
+            verifyOtpBtn.style.display = '';
+            sendOtpBtn.disabled = true;
+            resendOtpBtn.style.display = '';
+            messageDiv.style.color = 'green';
+            messageDiv.textContent = isResend ? 'OTP resent!' : 'OTP sent!';
+        } else {
+            messageDiv.style.color = '#d32f2f';
+            messageDiv.textContent = 'Failed to send OTP: ' + (data.error || 'Unknown error');
+        }
     } catch (err) {
         messageDiv.style.color = '#d32f2f';
-        messageDiv.textContent = err.message;
+        messageDiv.textContent = 'Error sending OTP.';
     }
+}
+
+sendOtpBtn.onclick = async () => {
+    const phone = document.getElementById('phone').value;
+    await sendOtp(phone, false);
+};
+
+resendOtpBtn.onclick = async () => {
+    resendOtpBtn.disabled = true;
+    const phone = document.getElementById('phone').value;
+    await sendOtp(phone, true);
+    setTimeout(() => {
+        resendOtpBtn.disabled = false;
+    }, 30000); // 30 seconds cooldown
 };
 
 verifyOtpBtn.onclick = async () => {
     const otp = otpInput.value;
-    try {
-        await confirmationResult.confirm(otp);
+    if (otp === sentOtp && sentPhone === document.getElementById('phone').value) {
         messageDiv.style.color = 'green';
         messageDiv.textContent = 'Phone login successful!';
-    } catch (err) {
+        resendOtpBtn.style.display = 'none';
+        sendOtpBtn.disabled = false;
+    } else {
         messageDiv.style.color = '#d32f2f';
-        messageDiv.textContent = err.message;
+        messageDiv.textContent = 'Invalid OTP.';
     }
 };
