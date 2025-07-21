@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CuraHealth OTP Login</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            background: linear-gradient(120deg, #1976d2 60%, #42a5f5 100%);
+            min-height: 100vh;
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .container {
+            background: #fff;
+            padding: 2.5rem 2rem 2rem 2rem;
+            border-radius: 16px;
+            box-shadow: 0 4px 24px rgba(25, 118, 210, 0.12);
+            width: 100%;
+            max-width: 370px;
+            margin: 0 1rem;
+        }
+        .logo {
+            display: block;
+            margin: 0 auto 1.2rem auto;
+            max-width: 90px;
+            border-radius: 18px;
+            box-shadow: 0 2px 8px rgba(25, 118, 210, 0.08);
+        }
+        h2 {
+            text-align: center;
+            margin-bottom: 1.2rem;
+            color: #1976d2;
+            font-size: 1.7rem;
+            font-weight: 600;
+        }
+        label {
+            display: block;
+            margin-bottom: 0.3rem;
+            color: #1976d2;
+            font-size: 1rem;
+            font-weight: 500;
+        }
+        input[type="text"] {
+            width: 100%;
+            padding: 0.8rem;
+            margin: 0.5rem 0 1rem 0;
+            border: 1px solid #b0bec5;
+            border-radius: 7px;
+            font-size: 1.08rem;
+            background: #f5f6fa;
+            transition: border 0.2s;
+        }
+        #phone {
+            max-width: 340px;
+            margin-left: auto;
+            margin-right: auto;
+            display: block;
+        }
+        input[type="text"]:focus {
+            border: 1.5px solid #1976d2;
+            outline: none;
+        }
+        button {
+            width: 100%;
+            padding: 0.8rem;
+            background: #1976d2;
+            color: #fff;
+            border: none;
+            border-radius: 7px;
+            font-size: 1.08rem;
+            margin-top: 0.5rem;
+            cursor: pointer;
+            font-weight: 500;
+            box-shadow: 0 2px 8px rgba(25, 118, 210, 0.08);
+            transition: background 0.2s;
+        }
+        button:hover {
+            background: #1565c0;
+        }
+        #resendOtp {
+            background: #db4437;
+            margin-top: 0.5rem;
+        }
+        #resendOtp:hover {
+            background: #c23321;
+        }
+        #message {
+            margin-top: 1rem;
+            text-align: center;
+            color: #d32f2f;
+            min-height: 1.2em;
+            font-size: 1.05rem;
+        }
+        @media (max-width: 500px) {
+            .container {
+                padding: 1.2rem 0.5rem;
+                max-width: 98vw;
+            }
+            h2 {
+                font-size: 1.2rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <img src="logo.png" alt="Cura Hospitals Logo" class="logo">
+        <h2>CuraHealth OTP Login</h2>
+        <form id="otpForm">
+            <label for="phone">Mobile Number</label>
+            <input type="text" id="phone" placeholder="Enter 10-digit mobile number" maxlength="10" required autocomplete="tel">
+            <button type="button" id="sendOtp">Send OTP</button>
+            <label for="otp" style="display:none; margin-top:1rem;" id="otpLabel">OTP</label>
+            <input type="text" id="otp" placeholder="Enter OTP" style="display:none;" maxlength="6" autocomplete="one-time-code">
+            <button type="button" id="verifyOtp" style="display:none;">Verify OTP</button>
+            <button type="button" id="resendOtp" style="display:none;">Resend OTP</button>
+        </form>
+        <div id="message"></div>
+    </div>
+    <script>
+        let sentOtp = '';
+        let sentPhone = '';
+        const sendOtpBtn = document.getElementById('sendOtp');
+        const verifyOtpBtn = document.getElementById('verifyOtp');
+        const otpInput = document.getElementById('otp');
+        const phoneInput = document.getElementById('phone');
+        const resendOtpBtn = document.getElementById('resendOtp');
+        const messageDiv = document.getElementById('message');
+        const otpLabel = document.getElementById('otpLabel');
+
+        function generateOtp() {
+            return Math.floor(100000 + Math.random() * 900000).toString();
+        }
+
+        async function sendOtp(phone, isResend = false) {
+            if (!/^\d{10}$/.test(phone)) {
+                messageDiv.style.color = '#d32f2f';
+                messageDiv.textContent = 'Enter a valid 10-digit mobile number.';
+                return;
+            }
+            sentOtp = generateOtp();
+            sentPhone = phone;
+            try {
+                const response = await fetch('/send-otp', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ phone: phone, otp: sentOtp })
+                });
+                const data = await response.json();
+                if (data.success) {
+                    otpInput.style.display = '';
+                    otpLabel.style.display = '';
+                    verifyOtpBtn.style.display = '';
+                    sendOtpBtn.disabled = true;
+                    resendOtpBtn.style.display = '';
+                    messageDiv.style.color = 'green';
+                    messageDiv.textContent = isResend ? 'OTP resent!' : 'OTP sent!';
+                } else {
+                    messageDiv.style.color = '#d32f2f';
+                    messageDiv.textContent = 'Failed to send OTP: ' + (data.error || 'Unknown error');
+                }
+            } catch (err) {
+                messageDiv.style.color = '#d32f2f';
+                messageDiv.textContent = 'Error sending OTP.';
+            }
+        }
+
+        sendOtpBtn.onclick = async () => {
+            const phone = phoneInput.value;
+            await sendOtp(phone, false);
+        };
+
+        resendOtpBtn.onclick = async () => {
+            resendOtpBtn.disabled = true;
+            const phone = phoneInput.value;
+            await sendOtp(phone, true);
+            setTimeout(() => {
+                resendOtpBtn.disabled = false;
+            }, 30000); // 30 seconds cooldown
+        };
+
+        verifyOtpBtn.onclick = async () => {
+            const otp = otpInput.value;
+            if (otp === sentOtp && sentPhone === phoneInput.value) {
+                messageDiv.style.color = 'green';
+                messageDiv.textContent = 'Phone login successful!';
+                resendOtpBtn.style.display = 'none';
+                sendOtpBtn.disabled = false;
+            } else {
+                messageDiv.style.color = '#d32f2f';
+                messageDiv.textContent = 'Invalid OTP.';
+            }
+        };
+    </script>
+</body>
+</html>
